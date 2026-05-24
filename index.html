@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Elevator Loader – Prototype</title>
+<style>
+  :root{
+    --bg:#15171c; --panel:#20242c; --ink:#f2f2f2; --muted:#aab0bd; --accent:#ffd166;
+    --ok:#7ee787; --bad:#ff6b6b; --box:#c98b54; --box2:#9d6b3f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden;}
+  #app{height:100%;display:flex;flex-direction:column;}
+  header{padding:10px 12px 8px;display:flex;align-items:center;gap:8px;background:#0f1116;border-bottom:1px solid #30343d;}
+  header h1{font-size:16px;margin:0;font-weight:800;letter-spacing:.3px;white-space:nowrap}
+  .pill{font-size:12px;padding:5px 8px;border-radius:999px;background:#252a33;color:var(--muted);}
+  .spacer{flex:1}
+  button{border:0;border-radius:10px;background:#343b49;color:var(--ink);padding:9px 11px;font-weight:700;font-size:13px;}
+  button:active{transform:scale(.97)}
+  button.primary{background:var(--accent);color:#2a1d00}
+  #hud{display:flex;gap:6px;padding:8px 10px;background:#171a20;align-items:center;overflow:auto;}
+  #hud .stat{background:#222732;border:1px solid #303847;border-radius:10px;padding:7px 9px;min-width:max-content;font-size:12px;color:#dfe3ea}
+  #gameWrap{position:relative;flex:1;overflow:hidden;background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,.05), transparent 25%),
+    linear-gradient(180deg,#1b1e25,#121419);}
+  #world{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(96vw,520px);height:min(72vh,650px);}
+  #elevator{
+    position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+    width:250px;height:340px;border:8px solid #808893;border-radius:8px;background:
+    repeating-linear-gradient(90deg,#363c45 0,#363c45 18px,#3f4650 18px,#3f4650 36px);
+    box-shadow:0 16px 50px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,255,255,.08);
+  }
+  #elevator:before{content:"VÝŤAH";position:absolute;top:-35px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:900;color:#cbd2dd;letter-spacing:2px}
+  #doorLine{position:absolute;left:-8px;right:-8px;bottom:-10px;height:12px;background:#111;border:1px solid #4c5563;border-radius:0 0 8px 8px}
+  #elevator.overweight{border-color:#ff6b6b;box-shadow:0 0 30px rgba(255,107,107,.3)}
+  #staging{
+    position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+    width:310px;height:150px;border:2px dashed #596170;border-radius:16px;
+    background:rgba(255,255,255,.035);
+  }
+  #staging:before{content:"SKLAD";position:absolute;left:12px;top:8px;color:#868e9f;font-size:12px;font-weight:800}
+  .box{
+    position:absolute;touch-action:none;border-radius:8px;border:2px solid rgba(65,38,15,.9);
+    background:linear-gradient(135deg,var(--box),var(--box2));
+    box-shadow:0 7px 14px rgba(0,0,0,.35), inset 0 0 0 2px rgba(255,255,255,.08);
+    display:flex;align-items:center;justify-content:center;color:#321b07;font-weight:900;font-size:12px;
+  }
+  .box:before,.box:after{content:"";position:absolute;background:rgba(80,44,16,.35)}
+  .box:before{left:50%;top:0;bottom:0;width:3px}
+  .box:after{top:50%;left:0;right:0;height:3px}
+  .box.selected{outline:4px solid rgba(255,209,102,.8);z-index:20}
+  .box.bad{outline:4px solid rgba(255,107,107,.85)}
+  #msg{
+    position:absolute;left:12px;right:12px;bottom:12px;background:rgba(10,12,16,.85);
+    border:1px solid #343b49;border-radius:14px;padding:10px 12px;font-size:13px;color:#e7eaf0;
+    backdrop-filter:blur(8px);display:none;
+  }
+  #levelModal{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.6);backdrop-filter:blur(6px);padding:20px;z-index:50;
+  }
+  .card{background:#20242c;border:1px solid #3a4352;border-radius:20px;padding:18px;width:min(92vw,420px);box-shadow:0 20px 80px rgba(0,0,0,.5)}
+  .card h2{margin:0 0 8px;font-size:24px}
+  .stars{font-size:34px;letter-spacing:3px;color:var(--accent);margin:8px 0}
+  .small{color:var(--muted);font-size:13px;line-height:1.4}
+  .row{display:flex;gap:8px;margin-top:14px}
+  .row button{flex:1}
+  #instructions{font-size:12px;color:#aab0bd;line-height:1.35;padding:7px 10px;background:#101217;border-top:1px solid #30343d}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Elevator Loader</h1>
+    <span class="pill">iPhone prototype</span>
+    <div class="spacer"></div>
+    <button id="resetBtn">Reset</button>
+    <button id="checkBtn" class="primary">Zavrieť výťah</button>
+  </header>
+  <div id="hud">
+    <div class="stat" id="levelStat">Level 1/10</div>
+    <div class="stat" id="scoreStat">Skóre: 0</div>
+    <div class="stat" id="moveStat">Pohyby: 0</div>
+    <div class="stat" id="weightStat">Váha: 0/100</div>
+    <div class="stat" id="timerStat">Čas: 0s</div>
+  </div>
+  <div id="gameWrap">
+    <div id="world">
+      <div id="elevator"><div id="doorLine"></div></div>
+      <div id="staging"></div>
+    </div>
+    <div id="msg"></div>
+    <div id="levelModal">
+      <div class="card">
+        <h2 id="modalTitle">Level hotový</h2>
+        <div class="stars" id="modalStars">★★★</div>
+        <div class="small" id="modalText"></div>
+        <div class="row">
+          <button id="retryBtn">Skúsiť znova</button>
+          <button id="nextBtn" class="primary">Ďalší level</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="instructions">Ovládanie: ťahaj krabice prstom. Ťukni na krabicu = otočiť o 90°. Cieľ: všetky krabice musia byť celé vo výťahu a nesmú sa prekrývať.</div>
+</div>
+<script>
+const levels = [
+ {name:"Prvé sťahovanie", limit:100, boxes:[[70,55,12],[70,55,12],[55,55,10],[90,45,15]]},
+ {name:"Dlhá polica", limit:105, boxes:[[140,38,18],[70,60,12],[65,55,12],[50,50,8]]},
+ {name:"Veľká skriňa", limit:120, boxes:[[105,95,35],[80,50,12],[60,50,10],[55,45,8]]},
+ {name:"Ťažké banánovky", limit:95, boxes:[[80,65,28],[80,65,28],[60,45,12],[50,45,10]]},
+ {name:"Úzky výťah", limit:110, elevator:[220,340], boxes:[[120,45,18],[120,45,18],[75,65,15],[65,55,12],[45,45,8]]},
+ {name:"Veľa drobností", limit:130, boxes:[[55,45,8],[55,45,8],[55,45,8],[65,50,10],[65,50,10],[75,55,12],[80,45,12]]},
+ {name:"Krehké sklo", limit:100, fragile:true, boxes:[[95,45,12],[95,45,12],[75,75,18],[60,55,10],[45,45,8]]},
+ {name:"Chladnička", limit:140, boxes:[[75,150,50],[90,55,15],[80,50,12],[65,50,10]]},
+ {name:"Chaos z dodávky", limit:155, boxes:[[110,55,18],[95,65,16],[80,65,15],[70,55,12],[55,55,10],[45,45,8]]},
+ {name:"Finále: byt 3. poschodie", limit:170, boxes:[[130,55,20],[100,80,25],[80,80,18],[75,60,14],[65,55,12],[55,45,8],[45,45,7]]}
+];
+
+let levelIndex=0, selected=null, drag=null, moves=0, startTime=Date.now(), score=0;
+const world=document.getElementById('world'), elevator=document.getElementById('elevator'), modal=document.getElementById('levelModal');
+const msg=document.getElementById('msg');
+
+function rectOf(el){
+  const r=el.getBoundingClientRect(), wr=world.getBoundingClientRect();
+  return {x:r.left-wr.left,y:r.top-wr.top,w:r.width,h:r.height};
+}
+function overlap(a,b){
+  return !(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y);
+}
+function inside(a,b){
+  return a.x>=b.x+2 && a.y>=b.y+2 && a.x+a.w<=b.x+b.w-2 && a.y+a.h<=b.y+b.h-2;
+}
+function allBoxes(){return [...document.querySelectorAll('.box')]}
+function currentWeight(){
+  return allBoxes().reduce((s,el)=>s+(+el.dataset.weight),0);
+}
+function updateHud(){
+  const elapsed=Math.floor((Date.now()-startTime)/1000);
+  const lv=levels[levelIndex];
+  document.getElementById('levelStat').textContent=`Level ${levelIndex+1}/10: ${lv.name}`;
+  document.getElementById('scoreStat').textContent=`Skóre: ${score}`;
+  document.getElementById('moveStat').textContent=`Pohyby: ${moves}`;
+  document.getElementById('weightStat').textContent=`Váha: ${currentWeight()}/${lv.limit}`;
+  document.getElementById('timerStat').textContent=`Čas: ${elapsed}s`;
+  elevator.classList.toggle('overweight', currentWeight()>lv.limit);
+}
+setInterval(updateHud,500);
+
+function loadLevel(i){
+  levelIndex=i; moves=0; startTime=Date.now(); selected=null; modal.style.display='none'; msg.style.display='none';
+  allBoxes().forEach(b=>b.remove());
+  const lv=levels[i];
+  const ew=(lv.elevator?.[0]||250), eh=(lv.elevator?.[1]||340);
+  elevator.style.width=ew+'px'; elevator.style.height=eh+'px';
+  const staging=document.getElementById('staging');
+  let sx=18, sy=45, rowH=0;
+  lv.boxes.forEach((b,idx)=>{
+    const el=document.createElement('div'); el.className='box'; el.dataset.weight=b[2]; el.dataset.id=idx;
+    el.style.width=b[0]+'px'; el.style.height=b[1]+'px'; el.textContent=b[2]+'kg';
+    if(sx+b[0]>285){sx=18; sy+=rowH+10; rowH=0;}
+    const sr=staging.getBoundingClientRect(), wr=world.getBoundingClientRect();
+    el.style.left=(sr.left-wr.left+sx)+'px'; el.style.top=(sr.top-wr.top+sy)+'px';
+    sx += b[0]+8; rowH=Math.max(rowH,b[1]);
+    world.appendChild(el);
+    bindBox(el);
+  });
+  updateHud();
+}
+function bindBox(el){
+  el.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    selected?.classList.remove('selected');
+    selected=el; selected.classList.add('selected');
+    const r=el.getBoundingClientRect();
+    drag={id:e.pointerId, x:e.clientX, y:e.clientY, left:parseFloat(el.style.left), top:parseFloat(el.style.top), moved:false, t:Date.now()};
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!drag || drag.id!==e.pointerId) return;
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true;
+    el.style.left=(drag.left+dx)+'px'; el.style.top=(drag.top+dy)+'px';
+    markBad();
+  });
+  el.addEventListener('pointerup', e=>{
+    if(!drag || drag.id!==e.pointerId) return;
+    if(!drag.moved && Date.now()-drag.t<350){ rotateBox(el); }
+    else moves++;
+    drag=null; snapBounds(el); markBad(); updateHud();
+  });
+}
+function rotateBox(el){
+  const w=el.offsetWidth, h=el.offsetHeight;
+  const cx=parseFloat(el.style.left)+w/2, cy=parseFloat(el.style.top)+h/2;
+  el.style.width=h+'px'; el.style.height=w+'px';
+  el.style.left=(cx-h/2)+'px'; el.style.top=(cy-w/2)+'px';
+  moves++;
+}
+function snapBounds(el){
+  let l=parseFloat(el.style.left), t=parseFloat(el.style.top);
+  l=Math.max(0,Math.min(world.clientWidth-el.offsetWidth,l));
+  t=Math.max(0,Math.min(world.clientHeight-el.offsetHeight,t));
+  el.style.left=l+'px'; el.style.top=t+'px';
+}
+function markBad(){
+  const boxes=allBoxes(); boxes.forEach(b=>b.classList.remove('bad'));
+  const er=rectOf(elevator);
+  boxes.forEach((b,i)=>{
+    const br=rectOf(b);
+    if(!inside(br,er)) b.classList.add('bad');
+    boxes.forEach((c,j)=>{ if(j>i && overlap(br,rectOf(c))){ b.classList.add('bad'); c.classList.add('bad'); }});
+  });
+}
+function checkLevel(){
+  const boxes=allBoxes(), er=rectOf(elevator), lv=levels[levelIndex];
+  let ok=true;
+  boxes.forEach((b,i)=>{
+    const br=rectOf(b);
+    if(!inside(br,er)) ok=false;
+    boxes.forEach((c,j)=>{ if(j>i && overlap(br,rectOf(c))) ok=false; });
+  });
+  if(currentWeight()>lv.limit) ok=false;
+  markBad();
+  if(!ok){
+    msg.style.display='block';
+    msg.innerHTML='Ešte nie: všetky krabice musia byť celé vo výťahu, bez prekrývania a pod váhovým limitom.';
+    return;
+  }
+  const time=Math.floor((Date.now()-startTime)/1000);
+  const base=1000, movePenalty=moves*18, timePenalty=time*6;
+  let gained=Math.max(150, base-movePenalty-timePenalty);
+  let stars = gained>780 ? 3 : gained>520 ? 2 : 1;
+  score += gained;
+  document.getElementById('modalTitle').textContent='Level hotový';
+  document.getElementById('modalStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('modalText').innerHTML=`Získal si <b>${gained}</b> bodov. Čas: ${time}s, pohyby: ${moves}.`;
+  document.getElementById('nextBtn').textContent= levelIndex===levels.length-1 ? 'Hrať odznova' : 'Ďalší level';
+  modal.style.display='flex';
+  updateHud();
+}
+document.getElementById('checkBtn').onclick=checkLevel;
+document.getElementById('resetBtn').onclick=()=>loadLevel(levelIndex);
+document.getElementById('retryBtn').onclick=()=>loadLevel(levelIndex);
+document.getElementById('nextBtn').onclick=()=>{
+  if(levelIndex===levels.length-1){score=0;loadLevel(0)} else loadLevel(levelIndex+1);
+};
+loadLevel(0);
+</script>
+</body>
+</html>
